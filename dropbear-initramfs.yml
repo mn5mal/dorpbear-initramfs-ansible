@@ -1,0 +1,138 @@
+---
+- name: Install and configure dropbear-initramfs on Debian-based systems
+  hosts: target_hosts
+  become: true
+  tasks:
+    - name: Check dropbear-initramfs version
+      shell: "dpkg -l | grep dropbear-initramfs | awk '{print $3}'"
+      register: dropbear_version
+      #ignore_errors: yes
+      #if u want to purge the current version and proceed anyway, just uncomment the upper line
+
+    - name: Debug dropbear version
+      debug:
+        msg: "Installed dropbear-initramfs version: {{ dropbear_version.stdout }}"
+
+    - name: Set dropbear_installed fact
+      set_fact:
+        dropbear_installed: "{{ dropbear_version.stdout.split('-')[0] == '2022.83' }}"
+
+    - name: Add Debian Bookworm repository to sources list
+      apt_repository:
+        repo: "deb http://deb.debian.org/debian bookworm main"
+        state: present
+      when: not dropbear_installed
+
+    - name: Update the apt cache
+      apt:
+        update_cache: yes
+      when: not dropbear_installed
+
+    - name: Purge dropbear-initramfs if incorrect version is installed
+      apt:
+        name: dropbear-initramfs
+        state: absent
+      when: dropbear_version.stdout != '2022.83-1+deb12u1'
+
+    - name: Install the correct version of dropbear-initramfs
+      apt:
+        name: dropbear-initramfs
+        state: present
+        default_release: bookworm
+      when: not dropbear_installed
+
+    - name: Configure dropbear-initramfs options
+      lineinfile:
+        path: /etc/dropbear/initramfs/dropbear.conf
+        regexp: '^DROPBEAR_OPTIONS'
+        line: 'DROPBEAR_OPTIONS="-I 180 -j -k -p 5768 -s -c cryptroot-unlock"'
+
+    - name: Add dropbear authorized_keys
+      copy:
+        dest: /etc/dropbear/initramfs/authorized_keys
+        mode: 0600
+        owner: root
+        group: root
+        content: |
+          public-ssh keys
+
+      #notify: update initramfs
+
+    - name: Gather package facts
+      package_facts:
+        manager: "auto"
+
+    - name: Install net-tools package if not installed
+      apt:
+        name: net-tools
+        state: present
+      when: "'net-tools' not in ansible_facts.packages"
+
+    - name: Install curl package if not installed
+      apt:
+        name: curl
+        state: present
+      when: "'curl' not in ansible_facts.packages"
+
+    - name: Gather network facts
+      setup:
+        gather_subset:
+          - network
+
+    - name: Get the IP address and network interface details
+      set_fact:
+        ssh_ip: "{{ ansible_default_ipv4.address }}"
+        ssh_interface: "{{ ansible_default_ipv4.interface }}"
+        gateway: "{{ ansible_default_ipv4.gateway }}"
+        netmask: "{{ ansible_default_ipv4.netmask }}"
+
+    - name: Update /etc/initramfs-tools/initramfs.conf
+      lineinfile:
+        path: /etc/initramfs-tools/initramfs.conf
+        state: present
+        regexp: '^IP=' # "^" Ensure the line starts with 'IP='
+        line: "IP={{ ssh_ip }}::{{ gateway }}:{{ netmask }}::{{ ssh_interface }}:off"
+
+    - name: Gather network facts
+      setup:
+        gather_subset:
+          - network  # Only gather network-related facts to optimize performance
+
+    - name: Get the IP address and network interface details
+      set_fact:
+        ssh_ip: "{{ ansible_default_ipv4.address }}"
+        ssh_interface: "{{ ansible_default_ipv4.interface }}"
+        gateway: "{{ ansible_default_ipv4.gateway }}"
+        netmask: "{{ ansible_default_ipv4.netmask }}"
+
+    - name: Identify the driver associated with the network interface
+      shell: "ls -1 /sys/class/net/ | grep -v lo | xargs -I{} bash -c 'basename `readlink -f /sys/class/net/{}/device/driver`'"
+      register: driver_output
+
+    - name: Extract the driver name from command output
+      set_fact:
+        driver_name: "{{ driver_output.stdout_lines | first }}"
+
+    - name: Update /etc/initramfs-tools/initramfs.conf
+      lineinfile:
+        path: /etc/initramfs-tools/initramfs.conf
+        state: present
+        regexp: '^IP='  # Ensure the line starts with 'IP='
+        line: "IP={{ ssh_ip }}::{{ gateway }}:{{ netmask }}::{{ ssh_interface }}:off"
+
+    - name: Append the driver to /etc/initramfs-tools/modules
+      lineinfile:
+        path: /etc/initramfs-tools/modules
+        line: "{{ driver_name }}"
+        state: present
+        create: yes  # Create the file if it does not exist
+        insertafter: EOF  # Insert the line at the end of the file
+
+    - name: Update initramfs
+      command: update-initramfs -u
+
+#https://packages.debian.org/bookworm/dropbear-initramfs stable repo ?
+
+#The reason behind "Check dropbear-initramfs version" task is showing as changed is likely because 
+#Ansible considers any change in the registered variable 
+#dropbear_version as a change, even if the command itself doesn't cause any change on the system.
