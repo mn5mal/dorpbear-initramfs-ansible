@@ -11,4 +11,18 @@ You should place your public ssh key in this section:<br />
         content: |
           public-ssh keys
 </pre><br />
-For better maintainability and security, you can load the public key from a file on the Ansible control machine.
+For better maintainability and security, you can load the public key from a file on the Ansible control machine.<br />
+Example login::
+<pre>$ ssh -i ~/.ssh/unlock_remote -p 2222 -o "HostKeyAlgorithms ssh-rsa" root@192.168.1.23
+Enter passphrase for key '/home/foo/.ssh/unlock_remote': 
+To unlock root partition, and maybe others like swap, run `cryptroot-unlock`.
+
+
+BusyBox v1.35.0 (Debian 1:1.35.0-4+b3) built-in shell (ash)
+Enter 'help' for a list of built-in commands.
+
+~ # cryptroot-unlock 
+Please unlock disk sda3_crypt: 
+cryptsetup: sda3_crypt set up successfully
+~ # Connection to 192.168.1.23 closed by remote host.
+Connection to 192.168.1.23 closed.</pre>
