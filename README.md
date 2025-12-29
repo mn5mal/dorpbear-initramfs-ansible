@@ -11,7 +11,7 @@ You should place your public ssh key in this section:<br />
         content: |
           public-ssh keys
 </pre><br />
-For better maintainability and security, you can load the public key from a file on the Ansible control machine.<br /><br />
+- For better maintainability and security, you can load the public key from a file on the Ansible control machine.<br /><br />
 Example login:
 <pre>$ ssh -i ~/.ssh/unlock_remote -p 2222 -o "HostKeyAlgorithms ssh-rsa" root@192.168.1.23
 Enter passphrase for key '/home/foo/.ssh/unlock_remote': 
