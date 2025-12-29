@@ -10,4 +10,4 @@ You should place your public ssh key in this section:<br />
         content: |
           public-ssh keys
 </pre><br />
-Also you can make it load it from a file.
+For better maintainability and security, you can load the public key from a file on the Ansible control machine.
