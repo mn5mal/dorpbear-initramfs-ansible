@@ -1,4 +1,5 @@
-An ansible scrypt to remotely Unlock an Encrypted Linux Server Using Dropbear.<br />
+To allow SSH access during the initramfs stage, you must provide at least one SSH public key.<br />
+Dropbear will use this key for authentication before the root filesystem is mounted.<br />
 You should place your public ssh key in this section:<br />
 <pre>
   - name: Add dropbear authorized_keys
